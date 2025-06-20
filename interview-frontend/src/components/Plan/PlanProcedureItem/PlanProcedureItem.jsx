@@ -3,6 +3,7 @@ import ReactSelect from "react-select";
 
 import {
   addUserToProcedure,
+  removeUserFromProcedure,
   getProcedureUsers
 } from "../../../api/api";
 
@@ -21,9 +22,17 @@ const PlanProcedureItem = ({ procedure, users }) => {
     }, [procedure.procedureId]);
     
     const handleAssignUserToProcedure = async (e) => {
+        var removed = e.length > 0 ? selectedUsers.filter(item => !e.includes(item)) : null;
+        var added = e.filter(item => !selectedUsers.includes(item));
         setSelectedUsers(e);
-        const usersvalue = e.map(item => item.value);
-        await addUserToProcedure(procedure.procedureId, usersvalue);
+        if(added && added.length > 0)
+        {
+            await addUserToProcedure(procedure.procedureId, added[0].value);
+        }
+        else {
+            await removeUserFromProcedure(procedure.procedureId,
+                 removed && removed.length > 0 ? removed[0].value : -1);
+        }
     };
 
     return (

@@ -11,19 +11,18 @@ using RL.Data;
 namespace RL.Backend.UnitTests;
 
 [TestClass]
-public class AddUserToProcedureTests
+public class RemoveUserFromProcedureTests
 {
     [TestMethod]
     [DataRow(-1)]
     [DataRow(0)]
     [DataRow(int.MinValue)]
-    public async Task AddUserToProcedureTests_InvalidProcedureId_ReturnsBadRequest(int procedureId)
+    public async Task RemoveUserFromProcedure_InvalidProcedureId_ReturnsBadRequest(int procedureId)
     {
         //Given
         var context = new Mock<RLContext>();
-        var logger = new Mock<ILogger<AddProcedureToPlanCommandHandler>>();
-        var sut = new AddUserToProcedureCommandHandler(context.Object, logger.Object);
-        var request = new AddUserToProcedureCommand()
+        var sut = new RemoveUserFromProcedureCommandHandler(context.Object, new Mock<ILogger<RemoveUserFromProcedureCommandHandler>>().Object);
+        var request = new RemoveUserFromProcedureCommand()
         {
             ProcedureId = procedureId,
             UserId =  1 
@@ -41,12 +40,12 @@ public class AddUserToProcedureTests
     [DataRow(1)]
     [DataRow(19)]
     [DataRow(35)]
-    public async Task AddUserToProcedureTests_ProcedureIdNotFound_ReturnsNotFound(int procedureId)
+    public async Task RemoveUserFromProcedure_ProcedureIdNotFound_ReturnsNotFound(int procedureId)
     {
         //Given
         var context = DbContextHelper.CreateContext();
-        var sut = new AddUserToProcedureCommandHandler(context, new Mock<ILogger<AddProcedureToPlanCommandHandler>>().Object);
-        var request = new AddUserToProcedureCommand()
+        var sut = new RemoveUserFromProcedureCommandHandler(context, new Mock<ILogger<RemoveUserFromProcedureCommandHandler>>().Object);
+        var request = new RemoveUserFromProcedureCommand()
         {
             ProcedureId = procedureId,
             UserId =  1 
@@ -71,48 +70,17 @@ public class AddUserToProcedureTests
         result.Succeeded.Should().BeFalse();
     }
 
-    [TestMethod]
-    [DataRow(1)]
-    [DataRow(19)]
-    [DataRow(35)]
-    public async Task AddUserToProcedureTests_UserIdNotFound_ReturnsNotFound(int procedureId)
-    {
-        //Given
-        var context = DbContextHelper.CreateContext();
-        var sut = new AddUserToProcedureCommandHandler(context, new Mock<ILogger<AddProcedureToPlanCommandHandler>>().Object);
-        var request = new AddUserToProcedureCommand()
-        {
-            UserId =  1 ,
-            ProcedureId = procedureId
-        };
-
-        context.Users.Add(new Data.DataModels.User { UserId = procedureId + 1 });
-;
-        context.Procedures.Add(new Data.DataModels.Procedure
-        {
-            ProcedureId = procedureId + 1,
-            ProcedureTitle = "Test Procedure"
-        });
-        await context.SaveChangesAsync();
-
-        //When
-        var result = await sut.Handle(request, new CancellationToken());
-
-        //Then
-        result.Exception.Should().BeOfType(typeof(NotFoundException));
-        result.Succeeded.Should().BeFalse();
-    }
 
     [TestMethod]
     [DataRow(1, 1)]
     [DataRow(19, 1010)]
     [DataRow(35, 69)]
-    public async Task AddUserToProcedureTests_AlreadyContainsUser_ReturnsSuccess(int userId, int procedureId)
+    public async Task RemoveUserFromProcedure_RemoveUser_ReturnsSuccess(int userId, int procedureId)
     {
         //Given
         var context = DbContextHelper.CreateContext();
-        var sut = new AddUserToProcedureCommandHandler(context, new Mock<ILogger<AddProcedureToPlanCommandHandler>>().Object);
-        var request = new AddUserToProcedureCommand()
+        var sut = new RemoveUserFromProcedureCommandHandler(context, new Mock<ILogger<RemoveUserFromProcedureCommandHandler>>().Object);
+        var request = new RemoveUserFromProcedureCommand()
         {
             UserId =  userId ,
             ProcedureId = procedureId
@@ -121,6 +89,10 @@ public class AddUserToProcedureTests
         context.Users.Add(new Data.DataModels.User
         {
             UserId = userId
+        });
+        context.Users.Add(new Data.DataModels.User
+        {
+            UserId = userId + 1
         });
         context.Procedures.Add(new Data.DataModels.Procedure
         {
@@ -132,12 +104,23 @@ public class AddUserToProcedureTests
             ProcedureId = procedureId,
             UserId = userId
         });
+        context.ProcedureUsers.Add(new Data.DataModels.ProcedureUser
+        {
+            ProcedureId = procedureId,
+            UserId = userId + 1
+        });
         await context.SaveChangesAsync();
 
         //When
         var result = await sut.Handle(request, new CancellationToken());
 
         //Then
+        var dbPlanProcedure = await context.ProcedureUsers.FirstOrDefaultAsync(pp => pp.UserId == userId  && pp.ProcedureId == procedureId);
+        dbPlanProcedure.Should().BeNull();
+
+        var dbPlanProcedure1 = await context.ProcedureUsers.FirstOrDefaultAsync(pp => pp.UserId == userId + 1 && pp.ProcedureId == procedureId);
+        dbPlanProcedure1.Should().NotBeNull();
+
         result.Value.Should().BeOfType(typeof(Unit));
         result.Succeeded.Should().BeTrue();
     }
@@ -146,14 +129,14 @@ public class AddUserToProcedureTests
     [DataRow(1, 1)]
     [DataRow(19, 1010)]
     [DataRow(35, 69)]
-    public async Task AddUserToProcedureTests_DoesntContainsUser_ReturnsSuccess(int userId, int procedureId)
+    public async Task RemoveUserFromProcedure_RemoveAllUser_ReturnsSuccess(int userId, int procedureId)
     {
         //Given
         var context = DbContextHelper.CreateContext();
-        var sut = new AddUserToProcedureCommandHandler(context, new Mock<ILogger<AddProcedureToPlanCommandHandler>>().Object);
-        var request = new AddUserToProcedureCommand()
+        var sut = new RemoveUserFromProcedureCommandHandler(context, new Mock<ILogger<RemoveUserFromProcedureCommandHandler>>().Object);
+        var request = new RemoveUserFromProcedureCommand()
         {
-            UserId =  userId ,
+            UserId = -1,
             ProcedureId = procedureId
         };
 
@@ -161,10 +144,24 @@ public class AddUserToProcedureTests
         {
             UserId = userId
         });
+        context.Users.Add(new Data.DataModels.User
+        {
+            UserId = userId + 1
+        });
         context.Procedures.Add(new Data.DataModels.Procedure
         {
             ProcedureId = procedureId,
             ProcedureTitle = "Test Procedure"
+        });
+        context.ProcedureUsers.Add(new Data.DataModels.ProcedureUser
+        {
+            ProcedureId = procedureId,
+            UserId = userId
+        });
+        context.ProcedureUsers.Add(new Data.DataModels.ProcedureUser
+        {
+            ProcedureId = procedureId,
+            UserId = userId + 1
         });
         await context.SaveChangesAsync();
 
@@ -173,10 +170,13 @@ public class AddUserToProcedureTests
 
         //Then
         var dbPlanProcedure = await context.ProcedureUsers.FirstOrDefaultAsync(pp => pp.UserId == userId && pp.ProcedureId == procedureId);
+        dbPlanProcedure.Should().BeNull();
 
-        dbPlanProcedure.Should().NotBeNull();
+        var dbPlanProcedure1 = await context.ProcedureUsers.FirstOrDefaultAsync(pp => pp.UserId == userId + 1 && pp.ProcedureId == procedureId);
+        dbPlanProcedure1.Should().BeNull();
 
         result.Value.Should().BeOfType(typeof(Unit));
         result.Succeeded.Should().BeTrue();
     }
+
 }

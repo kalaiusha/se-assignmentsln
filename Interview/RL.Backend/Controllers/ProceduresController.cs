@@ -33,8 +33,34 @@ public class ProceduresController : ControllerBase
     [HttpPost("AddUserToProcedure")]
     public async Task<IActionResult> AddUserToProcedure(AddUserToProcedureCommand command, CancellationToken token)
     {
-        var response = await _mediator.Send(command, token);
+        try
+        {
+            var response = await _mediator.Send(command, token);
 
-        return response.ToActionResult();
+            return response.ToActionResult();
+        }
+        catch (Exception ex)
+        {
+            var response = ApiResponse<Unit>.Fail(ex);
+            _logger.LogError(ex, "Error while adding user");
+            return response.ToActionResult();
+        }
+    }
+
+    [HttpPost("RemoveUserFromProcedure")]
+    public async Task<IActionResult> RemoveUserFromProcedure(RemoveUserFromProcedureCommand command, CancellationToken token)
+    {
+        try
+        {
+            var response = await _mediator.Send(command, token);
+
+            return response.ToActionResult();
+        }
+        catch (Exception ex)
+        {
+            var response = ApiResponse<Unit>.Fail(ex);
+            _logger.LogError(ex, "Error while removing user");
+            return response.ToActionResult();
+        }
     }
 }

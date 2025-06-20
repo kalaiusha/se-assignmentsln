@@ -7,13 +7,18 @@ using RL.Data.DataModels;
 
 namespace RL.Backend.Commands.Handlers.Plans;
 
+/// <summary>
+///  Add user to procedure
+/// </summary>
 public class AddUserToProcedureCommandHandler : IRequestHandler<AddUserToProcedureCommand, ApiResponse<Unit>>
 {
     private readonly RLContext _context;
+    private readonly ILogger<AddProcedureToPlanCommandHandler> _logger;
 
-    public AddUserToProcedureCommandHandler(RLContext context)
+    public AddUserToProcedureCommandHandler(RLContext context, ILogger<AddProcedureToPlanCommandHandler> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ApiResponse<Unit>> Handle(AddUserToProcedureCommand request, CancellationToken cancellationToken)
@@ -26,50 +31,38 @@ public class AddUserToProcedureCommandHandler : IRequestHandler<AddUserToProcedu
 
             var procedure = await _context.Procedures
                 .Include(p => p.ProcedureUsers)
-                .FirstOrDefaultAsync(p => p.ProcedureId == request.ProcedureId);
-
-            
+                .FirstOrDefaultAsync(p => p.ProcedureId == request.ProcedureId);            
 
             if (procedure is null)
                 return ApiResponse<Unit>.Fail(new NotFoundException($"ProcedureId: {request.ProcedureId} not found"));
 
-            foreach(var item in request.UserId)
-            {
-                var user = await _context.Users
-                            .FirstOrDefaultAsync(p => p.UserId == item);
-                if(user is not null && !procedure.ProcedureUsers.Any(p => p.UserId == user.UserId))
-                { 
-                    procedure.ProcedureUsers.Add(new ProcedureUser
-                    {
-                        UserId = user.UserId
-                    });
-                }
-            }
+            var user = await _context.Users
+                            .FirstOrDefaultAsync(p => p.UserId == request.UserId);
 
-            List<ProcedureUser> remove = new List<ProcedureUser>();
-            
-            foreach(var data in procedure.ProcedureUsers)
+            if(user is null)
+                return ApiResponse<Unit>.Fail(new NotFoundException($"UserId: {request.UserId} not found"));
+
+            if (user is not null && !procedure.ProcedureUsers.Any(p => p.UserId == user.UserId))
             {
-                if(!request.UserId.Contains(data.UserId))
+                procedure.ProcedureUsers.Add(new ProcedureUser
                 {
-                    remove.Add(data);
-                }
+                    UserId = user.UserId
+                });
+                _logger.LogInformation($"Added user {request.UserId} for procedure: {request.ProcedureId}");
             }
 
-            if(remove.Count > 0)
-            {
-                foreach(var data in remove)
-                {
-                    procedure.ProcedureUsers.Remove(data);
-                }
-            }
-
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
 
             return ApiResponse<Unit>.Succeed(new Unit());
         }
+        catch(OperationCanceledException e)
+        {
+            _logger.LogError(e, $"Error While adding user: {request.UserId} to procedure: {request.ProcedureId}");
+            return ApiResponse<Unit>.Fail(e);
+        }
         catch (Exception e)
         {
+            _logger.LogError(e, $"Error While adding user: {request.UserId} to procedure: {request.ProcedureId}");
             return ApiResponse<Unit>.Fail(e);
         }
     }

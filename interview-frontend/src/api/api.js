@@ -83,6 +83,23 @@ export const addUserToProcedure = async (procedureId, userId) => {
     return true;
 };
 
+export const removeUserFromProcedure = async (procedureId, userId) => {
+    const url = `${api_url}/Procedures/RemoveUserFromProcedure`;
+    var command = { procedureId: procedureId, userId:  userId};
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(command),
+    });
+
+    if (!response.ok) throw new Error("Failed to remove user");
+
+    return true;
+};
+
 export const getProcedureUsers = async (procedureId) => {
     const url = `${api_url}/ProcedureUser?$filter=procedureId eq ${procedureId}&$expand=user`;
     const response = await fetch(url, {
